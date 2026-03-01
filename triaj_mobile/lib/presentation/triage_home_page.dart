@@ -11,6 +11,7 @@ import '../services/firebase_bootstrap.dart';
 import '../services/triage_record_repository.dart';
 import 'triage_history_page.dart';
 import 'profile_page.dart';
+import 'scanner_pages.dart';
 
 class TriageHomePage extends StatefulWidget {
   const TriageHomePage({
@@ -162,24 +163,28 @@ class _Flowchart {
 
 class _PatientInfo {
   const _PatientInfo({
+    this.patientId,
     required this.age,
     required this.gender,
     required this.history,
     required this.time,
   });
 
+  final String? patientId;
   final String age;
   final String gender;
   final Set<String> history;
   final String time;
 
   _PatientInfo copyWith({
+    String? patientId,
     String? age,
     String? gender,
     Set<String>? history,
     String? time,
   }) {
     return _PatientInfo(
+      patientId: patientId ?? this.patientId,
       age: age ?? this.age,
       gender: gender ?? this.gender,
       history: history ?? this.history,
@@ -189,6 +194,7 @@ class _PatientInfo {
 
   static _PatientInfo empty(DateTime now) {
     return _PatientInfo(
+      patientId: null,
       age: '',
       gender: '',
       history: <String>{},
@@ -671,10 +677,11 @@ class _TriageHomePageState extends State<TriageHomePage> {
         time: report.time,
         discriminator: report.discriminator,
         patient: PatientSnapshot(
-          age: report.patient.age,
-          gender: report.patient.gender,
-          history: report.patient.history.toList(),
-          arrivalTime: report.patient.time,
+          patientId: _patient.patientId,
+          age: _patient.age,
+          gender: _patient.gender,
+          history: _patient.history.toList(),
+          arrivalTime: _patient.time,
         ),
         tsbResponses: report.tsbResponses,
         mtsPath: report.mtsPath,
@@ -1450,6 +1457,62 @@ class _TriageHomePageState extends State<TriageHomePage> {
       children: [
         _stepHeader(1, 'Hasta Bilgileri', null),
         const SizedBox(height: 8),
+        _field(
+          'TC KİMLİK / DOSYA NO',
+          TextField(
+            inputFormatters: [LengthLimitingTextInputFormatter(11)],
+            decoration: InputDecoration(
+              hintText: 'Kimlik veya dosya no girin',
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.qr_code_scanner, size: 20),
+                    tooltip: 'Barkod Okut (Dosya No)',
+                    onPressed: () async {
+                      final result = await Navigator.push<String>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BarcodeScannerPage(),
+                        ),
+                      );
+                      if (result != null && result.isNotEmpty) {
+                        setState(() {
+                          _patient = _patient.copyWith(patientId: result);
+                        });
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.document_scanner, size: 20),
+                    tooltip: 'Kimlik Tara (TC Kimlik No)',
+                    onPressed: () async {
+                      final result = await Navigator.push<String>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TextScannerPage(),
+                        ),
+                      );
+                      if (result != null && result.isNotEmpty) {
+                        setState(() {
+                          _patient = _patient.copyWith(patientId: result);
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            onChanged: (v) => setState(() {
+              _patient = _patient.copyWith(patientId: v);
+            }),
+            controller: TextEditingController(text: _patient.patientId ?? '')
+              ..selection = TextSelection.collapsed(
+                offset: (_patient.patientId ?? '').length,
+              ),
+          ),
+        ),
+        const SizedBox(height: 9),
         Row(
           children: [
             Expanded(

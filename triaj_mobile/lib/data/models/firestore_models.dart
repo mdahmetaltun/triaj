@@ -176,12 +176,14 @@ class UserAppSettings {
 
 class PatientSnapshot {
   const PatientSnapshot({
+    this.patientId,
     required this.age,
     required this.gender,
     required this.history,
     required this.arrivalTime,
   });
 
+  final String? patientId;
   final String age;
   final String gender;
   final List<String> history;
@@ -189,6 +191,7 @@ class PatientSnapshot {
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
+      'patientId': patientId,
       'age': age,
       'gender': gender,
       'history': history,
@@ -198,6 +201,7 @@ class PatientSnapshot {
 
   factory PatientSnapshot.fromMap(Map<String, dynamic> map) {
     return PatientSnapshot(
+      patientId: map['patientId'] as String?,
       age: (map['age'] as String?) ?? '',
       gender: (map['gender'] as String?) ?? '',
       history: ((map['history'] as List?) ?? <dynamic>[])

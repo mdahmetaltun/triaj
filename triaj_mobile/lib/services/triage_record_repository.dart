@@ -111,6 +111,18 @@ class TriageRecordRepository {
     await batch.commit();
   }
 
+  Future<void> deleteCaseRecord(String recordId) async {
+    final user = _authInstance.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    final batch = _firestoreInstance.batch();
+    batch.delete(_userRecords(user.uid).doc(recordId));
+    batch.delete(_firestoreInstance.collection('triage_records').doc(recordId));
+    await batch.commit();
+  }
+
   Future<void> saveRecord(Map<String, dynamic> data) async {
     final user = _authInstance.currentUser;
     if (user == null) {

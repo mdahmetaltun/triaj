@@ -40,6 +40,44 @@ class _TriageHistoryPageState extends State<TriageHistoryPage> {
     }
   }
 
+  Future<void> _confirmDelete(TriageCaseRecord record) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kaydı Sil'),
+        content: const Text(
+          'Bu triyaj kaydını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('İptal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sil', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() {
+        _isLoading = true;
+      });
+      try {
+        await _repository.deleteCaseRecord(record.id);
+        await _loadRecords();
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _error = 'Kayıt silinirken hata oluştu: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Color _getMtsColor(String mts) {
     switch (mts) {
       case 'K':
@@ -239,6 +277,9 @@ class _TriageHistoryPageState extends State<TriageHistoryPage> {
             children: [
               const Divider(),
               _buildDetailRow('Sonuç', record.discriminator),
+              if (record.patient.patientId != null &&
+                  record.patient.patientId!.isNotEmpty)
+                _buildDetailRow('Kimlik / Dosya No', record.patient.patientId!),
               _buildDetailRow('Hastanın Yaşı', record.patient.age),
               _buildDetailRow('Cinsiyeti', record.patient.gender),
               if (record.patient.history.isNotEmpty)
@@ -310,6 +351,25 @@ class _TriageHistoryPageState extends State<TriageHistoryPage> {
                   );
                 }),
               ],
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => _confirmDelete(record),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.red,
+                    size: 20,
+                  ),
+                  label: const Text(
+                    'Kaydı Sil',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         );
