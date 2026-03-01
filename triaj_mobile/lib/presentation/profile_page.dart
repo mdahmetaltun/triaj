@@ -9,7 +9,9 @@ import '../data/models/firestore_models.dart';
 import '../services/triage_record_repository.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.forceCompletion = false});
+
+  final bool forceCompletion;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -21,6 +23,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _allowPop = false;
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _surnameController = TextEditingController();
@@ -87,6 +90,21 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _saveProfile() async {
+    final name = _nameController.text.trim();
+    final surname = _surnameController.text.trim();
+    final inst = _institutionController.text.trim();
+    final prof = _professionController.text.trim();
+
+    if (name.isEmpty || surname.isEmpty || inst.isEmpty || prof.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lütfen tüm alanları doldurun.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -136,6 +154,9 @@ class _ProfilePageState extends State<ProfilePage> {
       await _recordRepository.upsertUserProfile(updatedProfile);
 
       if (mounted) {
+        setState(() {
+          _allowPop = true;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Profil başarıyla güncellendi!'),
@@ -172,179 +193,208 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
+  Future<bool> _onWillPop() async {
+    if (!widget.forceCompletion) return true;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Lütfen profilinizi tamamlayıp kaydedin.'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+    return false; // Prevent pop
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9), // Slate 100 bg
-      appBar: AppBar(
-        title: const Text(
-          "Kullanıcı Profili",
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+    return PopScope(
+      canPop: !widget.forceCompletion || _allowPop,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) {
+          setState(() {
+            _allowPop = true;
+          });
+          Navigator.of(context).pop(result);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF1F5F9), // Slate 100 bg
+        appBar: AppBar(
+          title: const Text(
+            "Kullanıcı Profili",
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+          ),
+          automaticallyImplyLeading: !widget.forceCompletion,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 0,
+          centerTitle: true,
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24.0,
-                vertical: 32.0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Photo Avatar
-                  GestureDetector(
-                    onTap: _pickImage,
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey.shade200,
-                            border: Border.all(color: Colors.white, width: 4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                blurRadius: 10,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(60),
-                            child: _selectedImageFile != null
-                                ? Image.file(
-                                    _selectedImageFile!,
-                                    fit: BoxFit.cover,
-                                  )
-                                : (_photoUrl != null && _photoUrl!.isNotEmpty)
-                                ? Image.network(_photoUrl!, fit: BoxFit.cover)
-                                : const Icon(
-                                    Icons.person,
-                                    size: 60,
-                                    color: Colors.grey,
-                                  ),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 32.0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Photo Avatar
+                    GestureDetector(
+                      onTap: _pickImage,
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 120,
+                            height: 120,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
+                              color: Colors.grey.shade200,
+                              border: Border.all(color: Colors.white, width: 4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 10,
+                                  spreadRadius: 1,
+                                ),
+                              ],
                             ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 20,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(60),
+                              child: _selectedImageFile != null
+                                  ? Image.file(
+                                      _selectedImageFile!,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : (_photoUrl != null && _photoUrl!.isNotEmpty)
+                                  ? Image.network(_photoUrl!, fit: BoxFit.cover)
+                                  : const Icon(
+                                      Icons.person,
+                                      size: 60,
+                                      color: Colors.grey,
+                                    ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    FirebaseAuth.instance.currentUser?.email ??
-                        'Bilinmeyen Kullanıcı',
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Form Fields mapped like cards
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        _buildTextField(
-                          "Adınız",
-                          _nameController,
-                          Icons.person_outline,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          "Soyadınız",
-                          _surnameController,
-                          Icons.badge_outlined,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          "Kurum",
-                          _institutionController,
-                          Icons.account_balance_outlined,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          "Meslek (Dr., Hemşire vb.)",
-                          _professionController,
-                          Icons.work_outline,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Save Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _saveProfile,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 2,
-                      ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
                               ),
-                            )
-                          : const Text(
-                              "Değişiklikleri Kaydet",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                              child: const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 20,
                               ),
                             ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 48),
-                ],
+                    const SizedBox(height: 16),
+                    Text(
+                      FirebaseAuth.instance.currentUser?.email ??
+                          'Bilinmeyen Kullanıcı',
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Form Fields mapped like cards
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          _buildTextField(
+                            "Adınız",
+                            _nameController,
+                            Icons.person_outline,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            "Soyadınız",
+                            _surnameController,
+                            Icons.badge_outlined,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            "Kurum",
+                            _institutionController,
+                            Icons.account_balance_outlined,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            "Meslek (Dr., Hemşire vb.)",
+                            _professionController,
+                            Icons.work_outline,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // Save Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _isSaving ? null : _saveProfile,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                "Değişiklikleri Kaydet",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 

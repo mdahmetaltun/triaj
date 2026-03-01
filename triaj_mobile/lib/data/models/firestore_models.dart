@@ -46,6 +46,17 @@ class AppUserProfile {
   final DateTime? updatedAt;
   final DateTime? lastLoginAt;
 
+  bool get isComplete {
+    return name != null &&
+        name!.trim().isNotEmpty &&
+        surname != null &&
+        surname!.trim().isNotEmpty &&
+        institution != null &&
+        institution!.trim().isNotEmpty &&
+        profession != null &&
+        profession!.trim().isNotEmpty;
+  }
+
   factory AppUserProfile.fromFirebaseUser(User user) {
     final providers = user.providerData
         .map((entry) => entry.providerId)

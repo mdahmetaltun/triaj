@@ -427,10 +427,16 @@ class _TriageHomePageState extends State<TriageHomePage> {
 
   Future<void> _syncCloudProfileAndSettings(User user) async {
     try {
-      await _recordRepository.upsertUserProfile(
-        AppUserProfile.fromFirebaseUser(user),
-      );
+      // Fetch existing profile to check completeness.
+      AppUserProfile? profile = await _recordRepository.fetchUserProfile();
 
+      if (profile == null) {
+        // First login or missing profile record.
+        profile = AppUserProfile.fromFirebaseUser(user);
+        await _recordRepository.upsertUserProfile(profile);
+      }
+
+      // Sync settings.
       final settings = await _recordRepository.fetchUserSettings();
       if (settings != null && mounted) {
         setState(() {
@@ -442,12 +448,24 @@ class _TriageHomePageState extends State<TriageHomePage> {
       } else {
         await _persistUserSettings();
       }
+
+      // Check for completeness and force navigation if needed.
+      if (!profile.isComplete && mounted) {
+        // Use a post-frame callback to ensure navigation happens smoothly after build.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const ProfilePage(forceCompletion: true),
+            ),
+          );
+        });
+      }
     } catch (e) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _authError = 'Profil ve ayarlar buluta yazılamadı: $e';
+        _authError = 'Profil ve ayarlar yüklenemedi: $e';
       });
     }
   }
