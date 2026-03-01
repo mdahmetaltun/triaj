@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>780836079890-299f1kj2jklhuugopvr8psn33siccf3r.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.780836079890-299f1kj2jklhuugopvr8psn33siccf3r</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCUS2-jxxaK6lanvpdgsd3yXNseCjjQObs</string>
+	<key>GCM_SENDER_ID</key>
+	<string>780836079890</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.triajMobile</string>
+	<key>PROJECT_ID</key>
+	<string>triaj-fabaa</string>
+	<key>STORAGE_BUCKET</key>
+	<string>triaj-fabaa.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:780836079890:ios:a65317e98a7574b55e0bcb</string>
+</dict>
+</plist>

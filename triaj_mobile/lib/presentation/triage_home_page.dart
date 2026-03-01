@@ -1,6 +1,15 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+import '../data/models/firestore_models.dart';
+import '../services/firebase_auth_service.dart';
+import '../services/firebase_bootstrap.dart';
+import '../services/triage_record_repository.dart';
+import 'triage_history_page.dart';
 
 class TriageHomePage extends StatefulWidget {
   const TriageHomePage({
@@ -216,6 +225,9 @@ class _CaseReport {
     required this.compat,
     required this.time,
     required this.discriminator,
+    required this.tsbResponses,
+    required this.mtsPath,
+    this.nrsValue,
   });
 
   final int no;
@@ -229,10 +241,16 @@ class _CaseReport {
   final _Compat compat;
   final String time;
   final String discriminator;
+  final List<Map<String, dynamic>> tsbResponses;
+  final List<Map<String, dynamic>> mtsPath;
+  final int? nrsValue;
 }
 
 class _TriageHomePageState extends State<TriageHomePage> {
   static const double _maxW = 430;
+  final FirebaseAuthService _authService = FirebaseAuthService.instance;
+  final TriageRecordRepository _recordRepository = TriageRecordRepository();
+  StreamSubscription<User?>? _authSub;
 
   _Scr _scr = _Scr.ana;
   bool _fade = true;
@@ -260,8 +278,14 @@ class _TriageHomePageState extends State<TriageHomePage> {
   String? _mtsResultCode;
   String? _mtsResultDiscriminator;
 
+  List<Map<String, dynamic>> _tsbResponsesLog = [];
+  List<Map<String, dynamic>> _mtsPathLog = [];
+
   _CaseReport? _active;
   DateTime? _t0;
+  User? _authUser;
+  bool _authBusy = false;
+  String? _authError;
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
@@ -293,6 +317,35 @@ class _TriageHomePageState extends State<TriageHomePage> {
     return set.toList();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    if (FirebaseBootstrap.isReady) {
+      _authUser = _authService.currentUser;
+      if (_authUser != null) {
+        unawaited(_syncCloudProfileAndSettings(_authUser!));
+      }
+      _authSub = _authService.authChanges.listen((user) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _authUser = user;
+          _authError = null;
+        });
+        if (user != null) {
+          unawaited(_syncCloudProfileAndSettings(user));
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
   Future<void> _go(_Scr s) async {
     setState(() {
       _fade = false;
@@ -307,6 +360,121 @@ class _TriageHomePageState extends State<TriageHomePage> {
     });
   }
 
+  Future<void> _signInWithGoogle() async {
+    if (!FirebaseBootstrap.isReady) {
+      setState(() {
+        _authError = 'Firebase başlatılamadı. Konfigürasyonu kontrol et.';
+      });
+      return;
+    }
+
+    setState(() {
+      _authBusy = true;
+      _authError = null;
+    });
+
+    try {
+      await _authService.signInWithGoogle();
+    } on GoogleSignInException catch (e) {
+      setState(() {
+        _authError = 'Google giriş hatası: ${e.code.name}';
+      });
+    } on PlatformException catch (e) {
+      setState(() {
+        _authError = e.message ?? 'Google giriş hatası';
+      });
+    } catch (e) {
+      setState(() {
+        _authError = 'Google giriş başarısız: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _authBusy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _signOut() async {
+    if (!FirebaseBootstrap.isReady) {
+      return;
+    }
+
+    setState(() {
+      _authBusy = true;
+      _authError = null;
+    });
+    try {
+      await _authService.signOut();
+    } catch (e) {
+      setState(() {
+        _authError = 'Çıkış başarısız: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _authBusy = false;
+        });
+      }
+    }
+  }
+
+  String _evalOrderCode(_EvalOrder order) {
+    return order == _EvalOrder.stsThenMts ? 'sts_then_mts' : 'mts_then_sts';
+  }
+
+  Future<void> _syncCloudProfileAndSettings(User user) async {
+    try {
+      await _recordRepository.upsertUserProfile(
+        AppUserProfile.fromFirebaseUser(user),
+      );
+
+      final settings = await _recordRepository.fetchUserSettings();
+      if (settings != null && mounted) {
+        setState(() {
+          _evalOrder = settings.evalOrder == 'mts_then_sts'
+              ? _EvalOrder.mtsThenSts
+              : _EvalOrder.stsThenMts;
+          _mtsStopAtFirstYes = settings.mtsStopAtFirstYes;
+        });
+      } else {
+        await _persistUserSettings();
+      }
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _authError = 'Profil ve ayarlar buluta yazılamadı: $e';
+      });
+    }
+  }
+
+  Future<void> _persistUserSettings() async {
+    if (!FirebaseBootstrap.isReady || _authUser == null) {
+      return;
+    }
+
+    try {
+      await _recordRepository.saveUserSettings(
+        UserAppSettings(
+          uid: _authUser!.uid,
+          themeMode: widget.themeMode == ThemeMode.dark ? 'dark' : 'light',
+          evalOrder: _evalOrderCode(_evalOrder),
+          mtsStopAtFirstYes: _mtsStopAtFirstYes,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _authError = 'Ayarlar Firebase\'e yazılamadı: $e';
+      });
+    }
+  }
+
   Future<void> _newCase() async {
     setState(() {
       _patient = _PatientInfo.empty(DateTime.now());
@@ -319,6 +487,8 @@ class _TriageHomePageState extends State<TriageHomePage> {
       _mtsPositiveIndices = <int>{};
       _mtsResultCode = null;
       _mtsResultDiscriminator = null;
+      _tsbResponsesLog = [];
+      _mtsPathLog = [];
       _tsbIdx = 0;
       _tsbNum = '';
       _tsbKat = null;
@@ -340,12 +510,18 @@ class _TriageHomePageState extends State<TriageHomePage> {
       _mtsPositiveIndices = <int>{};
       _mtsResultCode = null;
       _mtsResultDiscriminator = null;
+      _mtsPathLog = [];
     });
     await _go(_Scr.mts);
   }
 
   Future<void> _tsbYes() async {
     setState(() {
+      _tsbResponsesLog.add({
+        'question': _tq.question,
+        'answer': 'Evet',
+        'category': _tq.category,
+      });
       _tsbKat = _tq.category;
       _tsbMode = 'karar';
       _tsbNum = '';
@@ -355,6 +531,11 @@ class _TriageHomePageState extends State<TriageHomePage> {
 
   Future<void> _tsbNo() async {
     setState(() {
+      _tsbResponsesLog.add({
+        'question': _tq.question,
+        'answer': 'Hayır',
+        'category': _tq.category,
+      });
       _tsbNum = '';
       if (_tsbIdx + 1 < _tsbQ.length) {
         _tsbIdx += 1;
@@ -433,6 +614,9 @@ class _TriageHomePageState extends State<TriageHomePage> {
           _mtsFirstPositiveDisc ??
           _md?.description ??
           'Tüm diskriminatörler negatif',
+      tsbResponses: List.from(_tsbResponsesLog),
+      mtsPath: List.from(_mtsPathLog),
+      nrsValue: _nrs,
     );
 
     setState(() {
@@ -441,7 +625,52 @@ class _TriageHomePageState extends State<TriageHomePage> {
       _active = report;
     });
 
+    unawaited(_persistCaseReport(report));
     await _go(_Scr.sonuc);
+  }
+
+  Future<void> _persistCaseReport(_CaseReport report) async {
+    if (!FirebaseBootstrap.isReady || _authUser == null) {
+      return;
+    }
+
+    try {
+      final record = TriageCaseRecord(
+        id: '',
+        uid: _authUser!.uid,
+        userEmail: _authUser!.email,
+        caseNo: report.no,
+        schema: report.schema,
+        schemaKey: report.schemaKey,
+        tsb: report.tsb,
+        mts: report.mts,
+        tsbMode: report.tsbMode,
+        seconds: report.seconds,
+        compatibilityType: report.compat.type,
+        compatibilityShort: report.compat.short,
+        compatibilityMessage: report.compat.message,
+        time: report.time,
+        discriminator: report.discriminator,
+        patient: PatientSnapshot(
+          age: report.patient.age,
+          gender: report.patient.gender,
+          history: report.patient.history.toList(),
+          arrivalTime: report.patient.time,
+        ),
+        tsbResponses: report.tsbResponses,
+        mtsPath: report.mtsPath,
+        nrsValue: report.nrsValue,
+        createdAt: DateTime.now(),
+      );
+      await _recordRepository.saveCaseRecord(record);
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _authError = 'Triyaj kaydı Firebase\'e yazılamadı: $e';
+      });
+    }
   }
 
   void _recordMtsPositive(_Discriminator md) {
@@ -482,14 +711,34 @@ class _TriageHomePageState extends State<TriageHomePage> {
       return;
     }
     if (_mtsStopAtFirstYes) {
+      setState(() {
+        _mtsPathLog.add({
+          'discriminator': md.description,
+          'answer': 'Evet',
+          'category': md.category,
+        });
+      });
       await _handleMtsCategory(md.category, discriminator: md.description);
       return;
     }
+    setState(() {
+      _mtsPathLog.add({
+        'discriminator': md.description,
+        'answer': 'Evet',
+        'category': md.category,
+      });
+    });
     _recordMtsPositive(md);
     await _advanceMts();
   }
 
   Future<void> _mtsNo() async {
+    final md = _md;
+    if (md != null) {
+      setState(() {
+        _mtsPathLog.add({'discriminator': md.description, 'answer': 'Hayır'});
+      });
+    }
     await _advanceMts();
   }
 
@@ -510,6 +759,14 @@ class _TriageHomePageState extends State<TriageHomePage> {
     }
 
     if (_nrsMatches(md, _nrs)) {
+      setState(() {
+        _mtsPathLog.add({
+          'discriminator': md.description,
+          'value': 'NRS $_nrs',
+          'answer': 'Evet',
+          'category': md.category,
+        });
+      });
       if (_mtsStopAtFirstYes) {
         await _handleMtsCategory(md.category, discriminator: md.description);
         return;
@@ -591,6 +848,14 @@ class _TriageHomePageState extends State<TriageHomePage> {
     }
 
     if (_discCrossed(md)) {
+      setState(() {
+        _mtsPathLog.add({
+          'discriminator': md.description,
+          'value': _vals.entries.map((e) => '${e.key}: ${e.value}').join(', '),
+          'answer': 'Evet',
+          'category': md.category,
+        });
+      });
       if (_mtsStopAtFirstYes) {
         await _handleMtsCategory(md.category, discriminator: md.description);
         return;
@@ -776,6 +1041,8 @@ class _TriageHomePageState extends State<TriageHomePage> {
               ),
             ),
           ),
+          const SizedBox(width: 4),
+          _buildAuthControl(),
           IconButton(
             onPressed: widget.onToggleTheme,
             tooltip: widget.themeMode == ThemeMode.dark
@@ -790,7 +1057,12 @@ class _TriageHomePageState extends State<TriageHomePage> {
           ),
           const SizedBox(width: 4),
           TextButton(
-            onPressed: () => _go(_Scr.rapor),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TriageHistoryPage()),
+              );
+            },
             style: TextButton.styleFrom(
               backgroundColor: _pick(
                 const Color(0x0CFFFFFF),
@@ -807,7 +1079,7 @@ class _TriageHomePageState extends State<TriageHomePage> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: Text(
-              '📊 ${_cases.length}',
+              '📊 Geçmiş',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
@@ -817,6 +1089,91 @@ class _TriageHomePageState extends State<TriageHomePage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAuthControl() {
+    if (!FirebaseBootstrap.isReady) {
+      return Tooltip(
+        message: 'Firebase bağlanamadı',
+        child: Icon(
+          Icons.cloud_off_rounded,
+          size: 18,
+          color: _pick(const Color(0xFFA38CCF), const Color(0xFFB39CCF)),
+        ),
+      );
+    }
+
+    if (_authUser == null) {
+      return TextButton(
+        onPressed: _authBusy ? null : _signInWithGoogle,
+        style: TextButton.styleFrom(
+          backgroundColor: _pick(
+            const Color(0x1EFFFFFF),
+            const Color(0xFFF2E8FF),
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: Text(
+          _authBusy ? '...' : 'Google',
+          style: TextStyle(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w700,
+            color: _pick(const Color(0xFFE5D7FF), const Color(0xFF6B46C1)),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: _authUser?.email ?? 'Google kullanıcı',
+          child: CircleAvatar(
+            radius: 14,
+            backgroundColor: _pick(
+              const Color(0x338B5CF6),
+              const Color(0x33FF9F68),
+            ),
+            child: Text(
+              ((_authUser?.displayName ?? _authUser?.email ?? 'G').trim())
+                  .substring(0, 1)
+                  .toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _pick(const Color(0xFFF0E8FF), const Color(0xFF6B46C1)),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        TextButton.icon(
+          onPressed: _authBusy ? null : _signOut,
+          icon: const Icon(Icons.logout_rounded, size: 14),
+          label: const Text('Çıkış'),
+          style: TextButton.styleFrom(
+            backgroundColor: _pick(
+              const Color(0x1EFFFFFF),
+              const Color(0xFFFDEDEE),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            foregroundColor: _pick(
+              const Color(0xFFFFD7DF),
+              const Color(0xFFB42318),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -882,6 +1239,64 @@ class _TriageHomePageState extends State<TriageHomePage> {
               ),
             ),
           ),
+          if (!FirebaseBootstrap.isReady) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: _pick(const Color(0x24FFB86B), const Color(0x2AFFF0C2)),
+                border: Border.all(
+                  color: _pick(
+                    const Color(0x66FFB86B),
+                    const Color(0x88FFC96E),
+                  ),
+                ),
+              ),
+              child: Text(
+                'Firebase bağlı değil. Google auth ve triaj kayıtları devre dışı.',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: _pick(
+                    const Color(0xFFFFD7A6),
+                    const Color(0xFF915600),
+                  ),
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+          if (_authError != null && _authError!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: _pick(const Color(0x26EF4444), const Color(0x20F87171)),
+                border: Border.all(
+                  color: _pick(
+                    const Color(0x66EF4444),
+                    const Color(0x66F87171),
+                  ),
+                ),
+              ),
+              child: Text(
+                _authError!,
+                style: TextStyle(
+                  fontSize: 9,
+                  color: _pick(
+                    const Color(0xFFFECACA),
+                    const Color(0xFF9F1239),
+                  ),
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           if (_cases.isNotEmpty) _buildSessionStats(),
           Column(
@@ -1171,16 +1586,22 @@ class _TriageHomePageState extends State<TriageHomePage> {
                     _orderChip(
                       label: '1) STS → 2) MTS',
                       selected: _evalOrder == _EvalOrder.stsThenMts,
-                      onTap: () => setState(() {
-                        _evalOrder = _EvalOrder.stsThenMts;
-                      }),
+                      onTap: () {
+                        setState(() {
+                          _evalOrder = _EvalOrder.stsThenMts;
+                        });
+                        unawaited(_persistUserSettings());
+                      },
                     ),
                     _orderChip(
                       label: '1) MTS → 2) STS',
                       selected: _evalOrder == _EvalOrder.mtsThenSts,
-                      onTap: () => setState(() {
-                        _evalOrder = _EvalOrder.mtsThenSts;
-                      }),
+                      onTap: () {
+                        setState(() {
+                          _evalOrder = _EvalOrder.mtsThenSts;
+                        });
+                        unawaited(_persistUserSettings());
+                      },
                     ),
                   ],
                 ),
@@ -2020,6 +2441,7 @@ class _TriageHomePageState extends State<TriageHomePage> {
                   setState(() {
                     _mtsStopAtFirstYes = v;
                   });
+                  unawaited(_persistUserSettings());
                 },
               ),
             ],

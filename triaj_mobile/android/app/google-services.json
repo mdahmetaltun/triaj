@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "780836079890",
+    "project_id": "triaj-fabaa",
+    "storage_bucket": "triaj-fabaa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:780836079890:android:f9655d4513fc064b5e0bcb",
+        "android_client_info": {
+          "package_name": "com.example.triaj_mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "780836079890-fmg8bgki399abi14ppmafjkbgbtf5bak.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnnzEoIVJn9KTQ137F6-k0zgo6C5kPneY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "780836079890-fmg8bgki399abi14ppmafjkbgbtf5bak.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

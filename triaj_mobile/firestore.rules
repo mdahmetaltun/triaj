@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isNullableString(data, key) {
+      return !(key in data) || data[key] == null || data[key] is string;
+    }
+
+    function validUserProfile(data, uid) {
+      return data.keys().hasOnly([
+               'uid',
+               'email',
+               'displayName',
+               'photoUrl',
+               'providerIds',
+               'createdAt',
+               'updatedAt',
+               'lastLoginAt'
+             ]) &&
+             data.uid == uid &&
+             isNullableString(data, 'email') &&
+             isNullableString(data, 'displayName') &&
+             isNullableString(data, 'photoUrl') &&
+             data.providerIds is list &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time &&
+             data.lastLoginAt == request.time;
+    }
+
+    function validUserSettings(data, uid) {
+      return data.keys().hasOnly([
+               'uid',
+               'themeMode',
+               'evalOrder',
+               'mtsStopAtFirstYes',
+               'updatedAt'
+             ]) &&
+             data.uid == uid &&
+             data.themeMode in ['light', 'dark'] &&
+             data.evalOrder in ['sts_then_mts', 'mts_then_sts'] &&
+             data.mtsStopAtFirstYes is bool &&
+             data.updatedAt == request.time;
+    }
+
+    function validPatientSnapshot(patient) {
+      return patient is map &&
+             patient.keys().hasOnly([
+               'age',
+               'gender',
+               'history',
+               'arrivalTime'
+             ]) &&
+             patient.age is string &&
+             patient.gender is string &&
+             patient.arrivalTime is string &&
+             patient.history is list &&
+             patient.history.size() <= 50;
+    }
+
+    function validCaseRecord(data, uid, recordId) {
+      return data.keys().hasOnly([
+               'id',
+               'uid',
+               'userEmail',
+               'caseNo',
+               'schema',
+               'schemaKey',
+               'tsb',
+               'mts',
+               'tsbMode',
+               'seconds',
+               'compatibilityType',
+               'compatibilityShort',
+               'compatibilityMessage',
+               'time',
+               'discriminator',
+               'patient',
+               'createdAt',
+               'savedAt'
+             ]) &&
+             data.id == recordId &&
+             data.uid == uid &&
+             isNullableString(data, 'userEmail') &&
+             data.caseNo is int &&
+             data.schema is string &&
+             data.schemaKey is string &&
+             data.tsb is string &&
+             data.mts is string &&
+             isNullableString(data, 'tsbMode') &&
+             data.seconds is int &&
+             data.compatibilityType is string &&
+             data.compatibilityShort is string &&
+             data.compatibilityMessage is string &&
+             data.time is string &&
+             data.discriminator is string &&
+             validPatientSnapshot(data.patient) &&
+             data.createdAt is timestamp &&
+             data.savedAt == request.time;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) &&
+                            validUserProfile(request.resource.data, uid);
+      allow delete: if isOwner(uid);
+
+      match /meta/{docId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) &&
+                              docId == 'settings' &&
+                              validUserSettings(request.resource.data, uid);
+        allow delete: if isOwner(uid) && docId == 'settings';
+      }
+
+      match /triage_records/{recordId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) &&
+                              validCaseRecord(request.resource.data, uid, recordId);
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // Legacy collection for backward compatibility.
+    match /triage_records/{recordId} {
+      allow read, delete: if isSignedIn() &&
+                          resource.data.uid == request.auth.uid;
+      allow create, update: if isSignedIn() &&
+                            validCaseRecord(
+                              request.resource.data,
+                              request.auth.uid,
+                              recordId
+                            );
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

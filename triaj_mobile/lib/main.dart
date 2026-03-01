@@ -1,10 +1,10 @@
 import 'package:flutter/widgets.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app.dart';
+import 'services/firebase_bootstrap.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  GoogleFonts.config.allowRuntimeFetching = false;
+  await FirebaseBootstrap.ensureInitialized();
   runApp(const TriageMobileApp());
 }
