@@ -38,6 +38,21 @@ class TriageRecordRepository {
     await _userDoc(profile.uid).set(payload, SetOptions(merge: true));
   }
 
+  Future<AppUserProfile?> fetchUserProfile() async {
+    final user = _authInstance.currentUser;
+    if (user == null) {
+      return null;
+    }
+
+    final snapshot = await _userDoc(user.uid).get();
+    final data = snapshot.data();
+    if (data == null) {
+      return null;
+    }
+
+    return AppUserProfile.fromMap(data);
+  }
+
   Future<void> saveUserSettings(UserAppSettings settings) async {
     final payload = <String, dynamic>{
       ...settings.toMap(),

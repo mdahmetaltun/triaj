@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triyaj Admin Paneli</title>
+    <!-- Modern Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        },
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        safe: '#10b981',
+                        info: '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        .record-card {
+            transition: all 0.2s ease-in-out;
+        }
+
+        .record-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .badge-kirmizi {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .badge-sari {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+
+        .badge-yesil {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #22c55e;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .details-area {
+            display: none;
+        }
+
+        .details-area.visible {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen antialiased flex flex-col">
+
+    <!-- Header -->
+    <header class="glass-panel sticky top-0 z-50 w-full mb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-brand-500 text-white p-2 rounded-lg">
+                    <svg xmlns="http://www.w3.org/-2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900 leading-tight">Triyaj Admin Paneli</h1>
+                    <p class="text-xs text-gray-500 font-medium">Merkezi Vaka Veritabanı</p>
+                </div>
+            </div>
+            <div id="auth-section" class="flex flex-col items-end">
+                <button id="login-btn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/-2000/svg" class="h-4 w-4" viewBox="0 0 48 48">
+                        <path fill="#FFC107"
+                            d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
+                        <path fill="#FF3D00"
+                            d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
+                        <path fill="#4CAF50"
+                            d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
+                        <path fill="#1976D2"
+                            d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+                    </svg>
+                    Google ile Giriş Yap
+                </button>
+                <div id="user-info" class="hidden flex items-center gap-4">
+                    <div class="text-right hidden sm:block">
+                        <p id="user-email" class="text-sm font-semibold text-gray-800"></p>
+                        <p class="text-xs text-brand-600 font-medium tracking-wide uppercase">Yetkili Admin</p>
+                    </div>
+                    <button id="logout-btn"
+                        class="text-gray-500 hover:text-red-600 transition-colors p-2 rounded-full hover:bg-red-50"
+                        title="Çıkış Yap">
+                        <svg xmlns="http://www.w3.org/-2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pb-12">
+
+        <!-- Welcome / Login Prompt -->
+        <div id="login-prompt" class="mt-20 text-center glass-panel p-12 rounded-2xl max-w-2xl mx-auto">
+            <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg xmlns="http://www.w3.org/-2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-3">Sisteme Giriş Yapın</h2>
+            <p class="text-gray-600 mb-8 max-w-md mx-auto">Tüm triyaj vakalarını görüntüleyebilmek için yetkili bir
+                hesaba ihtiyacınız var. Lütfen Google hesabınızla giriş yapın.</p>
+        </div>
+
+        <!-- Dashboard Area -->
+        <div id="dashboard-area" class="hidden">
+
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-l-brand-500">
+                    <p class="text-sm font-medium text-gray-500 mb-1">Toplam Vaka</p>
+                    <p id="stat-total" class="text-3xl font-bold text-gray-900">-</p>
+                </div>
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-l-danger">
+                    <p class="text-sm font-medium text-gray-500 mb-1">Kırmızı (MTS)</p>
+                    <p id="stat-kirmizi" class="text-3xl font-bold text-danger">-</p>
+                </div>
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-l-warning">
+                    <p class="text-sm font-medium text-gray-500 mb-1">Turuncu/Sarı</p>
+                    <p id="stat-sari" class="text-3xl font-bold text-warning">-</p>
+                </div>
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-l-safe">
+                    <p class="text-sm font-medium text-gray-500 mb-1">Yeşil/Mavi</p>
+                    <p id="stat-yesil" class="text-3xl font-bold text-safe">-</p>
+                </div>
+            </div>
+
+            <!-- Header Row -->
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/-2000/svg" class="h-5 w-5 text-gray-500" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    Tüm Triyaj Kayıtları
+                </h3>
+                <div class="flex gap-2">
+                    <button id="export-excel-btn"
+                        class="text-sm text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 flex items-center gap-2 transition-colors font-medium">
+                        <svg xmlns="http://www.w3.org/-2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Excel'e Aktar
+                    </button>
+                    <button id="refresh-btn"
+                        class="text-sm text-gray-600 bg-white border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors">
+                        <svg xmlns="http://www.w3.org/-2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Yenile
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="py-20 flex flex-col items-center justify-center">
+                <div class="loader mb-4"></div>
+                <p class="text-gray-500 font-medium">Kayıtlar Sunucudan Çekiliyor...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden py-20 text-center glass-panel rounded-xl">
+                <svg xmlns="http://www.w3.org/-2000/svg" class="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p class="text-lg font-medium text-gray-600">Henüz hiç triyaj kaydı bulunmuyor.</p>
+                <p class="text-sm text-gray-400 mt-1">Mobil uygulamadan vaka kaydettikçe burada görünecektir.</p>
+            </div>
+
+            <!-- Records List (Grid) -->
+            <div id="records-list" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <!-- Cards will be injected here via JS -->
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Firebase SDK Kurulumu -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs, orderBy, query, limit } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+        // Projenizin firebase_options.dart dosyasından alınan ayarları
+        const firebaseConfig = {
+            apiKey: 'AIzaSyCnnzEoIVJn9KTQ137F6-k0zgo6C5kPneY',
+            authDomain: 'triaj-fabaa.firebaseapp.com',
+            appId: '1:780836079890:web:dummy_for_auth', // Using a placeholder for web id if missing, mostly need API key
+            projectId: 'triaj-fabaa',
+            storageBucket: 'triaj-fabaa.firebasestorage.app',
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // UI Elements
+        const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const loginPrompt = document.getElementById('login-prompt');
+        const dashboardArea = document.getElementById('dashboard-area');
+        const userInfo = document.getElementById('user-info');
+        const userEmailElem = document.getElementById('user-email');
+        const recordsList = document.getElementById('records-list');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const emptyState = document.getElementById('empty-state');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const exportExcelBtn = document.getElementById('export-excel-btn');
+
+        // Stats Elements
+        const elTotal = document.getElementById('stat-total');
+        const elKirmizi = document.getElementById('stat-kirmizi');
+        const elSari = document.getElementById('stat-sari');
+        const elYesil = document.getElementById('stat-yesil');
+
+        // Helpers
+        function getMtsBadgeClass(code) {
+            switch (code) {
+                case 'K': return 'badge-kirmizi';
+                case 'T': return 'bg-orange-100 text-orange-800 border border-orange-200';
+                case 'S': return 'badge-sari';
+                case 'Y': return 'badge-yesil';
+                case 'M': return 'bg-blue-100 text-blue-800 border border-blue-200';
+                case 'B': return 'bg-gray-100 text-gray-800 border border-gray-200';
+                default: return 'bg-gray-100 text-gray-800 border border-gray-200';
+            }
+        }
+
+        function getStsBadgeClass(code) {
+            if (code === 'KIRMIZI') return 'badge-kirmizi';
+            if (code === 'SARI') return 'badge-sari';
+            if (code === 'YESIL' || code === 'YE') return 'badge-yesil';
+            return 'bg-gray-100 text-gray-800 border border-gray-200';
+        }
+
+        function getCompatClass(type) {
+            if (type === 'uyumlu') return 'text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200';
+            if (type === 'alttriaj') return 'text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200';
+            if (type === 'usttriaj') return 'text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200';
+            return 'text-gray-500';
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'Tarih Yok';
+            // Firebase timestamp handling
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleDateString('tr-TR', {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+        }
+
+        // Expanded Card Logic
+        window.toggleDetails = function (id) {
+            const el = document.getElementById(`details-${id}`);
+            const btn = document.getElementById(`btn-${id}`);
+            if (el.classList.contains('visible')) {
+                el.classList.remove('visible');
+                btn.innerHTML = 'Detayları Göster &darr;';
+            } else {
+                el.classList.add('visible');
+                btn.innerHTML = 'Detayları Gizle &uarr;';
+            }
+        }
+
+        // Global Array to hold fetched data for export
+        window.allTriageDataExport = [];
+
+        // Fetch Data
+        async function fetchRecords() {
+            recordsList.innerHTML = '';
+            loadingIndicator.style.display = 'flex';
+            emptyState.style.display = 'none';
+            window.allTriageDataExport = [];
+
+            let kirmiziCount = 0;
+            let sariCount = 0;
+            let yesilCount = 0;
+
+            try {
+                // Triage mobil uygulaması, hem user altındaki collection'a, hem de root'taki 'triage_records' collection'a yazıyor
+                // Verileri root collection'dan tüm vakaları almak için çekelim
+                const q = query(collection(db, "triage_records"), orderBy("savedAt", "desc"), limit(200));
+                const querySnapshot = await getDocs(q);
+
+                loadingIndicator.style.display = 'none';
+
+                if (querySnapshot.empty) {
+                    emptyState.style.display = 'block';
+                    elTotal.innerText = '0';
+                    return;
+                }
+
+                elTotal.innerText = querySnapshot.size.toString();
+
+                let html = '';
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const id = doc.id;
+
+                    window.allTriageDataExport.push({ id, ...data });
+
+                    // Stats calculation
+                    if (data.mts === 'K') kirmiziCount++;
+                    if (data.mts === 'T' || data.mts === 'S') sariCount++;
+                    if (data.mts === 'Y' || data.mts === 'M' || data.mts === 'B') yesilCount++;
+
+                    // Patient Details
+                    let patientStr = '';
+                    if (data.patient) {
+                        const p = data.patient;
+                        patientStr = `${p.age ? p.age : '-'} YAŞ • ${p.gender ? p.gender.substring(0, 1).toUpperCase() : '-'} • ${p.arrivalTime || ''}`;
+                    }
+
+                    // TSB Datalogs
+                    let tsbLogsHtml = '';
+                    if (data.tsbResponses && data.tsbResponses.length > 0) {
+                        data.tsbResponses.forEach(r => {
+                            const isYes = r.answer === 'Evet';
+                            const icon = isYes ? '<span class="text-red-500 mr-2">●</span>' : '<span class="text-gray-400 mr-2">○</span>';
+                            tsbLogsHtml += `<div class="text-xs mb-1">${icon} ${r.question} <strong>&rarr; ${r.answer}</strong></div>`;
+                        });
+                    } else {
+                        tsbLogsHtml = '<div class="text-xs text-gray-400 italic">Adım verisi yok</div>';
+                    }
+
+                    // MTS Datalogs
+                    let mtsLogsHtml = '';
+                    if (data.mtsPath && data.mtsPath.length > 0) {
+                        data.mtsPath.forEach(r => {
+                            const isYes = r.answer === 'Evet';
+                            const icon = isYes ? '<span class="text-red-500 mr-2">●</span>' : '<span class="text-gray-400 mr-2">○</span>';
+                            const valStr = r.value ? ` <span class="text-gray-500">(${r.value})</span>` : '';
+                            mtsLogsHtml += `<div class="text-xs mb-1">${icon} ${r.discriminator}${valStr} <strong>&rarr; ${r.answer}</strong></div>`;
+                        });
+                    } else {
+                        mtsLogsHtml = '<div class="text-xs text-gray-400 italic">Adım verisi yok</div>';
+                    }
+
+                    html += `
+                    <div class="glass-panel rounded-xl p-5 record-card border border-gray-100 flex flex-col h-full relative">
+                        <!-- Top Row: Date & Person -->
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <span class="inline-block bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded tracking-wider uppercase mb-1">
+                                    VAKA #${data.caseNo}
+                                </span>
+                                <h4 class="text-md font-bold text-gray-900 leading-snug">${data.schema || 'Şema Yok'}</h4>
+                                <p class="text-xs text-gray-500 mt-0.5">${patientStr}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-gray-400 font-medium">${formatDate(data.savedAt)}</p>
+                                <p class="text-[10px] text-gray-400 truncate w-24 mt-1" title="${data.userEmail}">${data.userEmail ? data.userEmail.split('@')[0] : 'Bilinmeyen Kullanıcı'}</p>
+                            </div>
+                        </div>
+
+                        <!-- Mid Row: Badges -->
+                        <div class="flex flex-wrap gap-2 items-center mb-4 pt-3 border-t border-gray-100">
+                            <span class="text-xs font-bold px-2.5 py-1 ${getStsBadgeClass(data.tsb)} rounded">STS: ${data.tsb || '?'}</span>
+                            <span class="text-xs font-bold px-2.5 py-1 ${getMtsBadgeClass(data.mts)} rounded">MTS: ${data.mts || '?'}</span>
+                            ${data.compatibilityShort ? `<span class="text-[10px] font-bold ${getCompatClass(data.compatibilityType)} leading-none">${data.compatibilityShort.toUpperCase()}</span>` : ''}
+                        </div>
+
+                        <!-- Main Conclusion -->
+                        <div class="bg-gray-50 rounded-lg p-3 mt-auto border border-gray-100">
+                            <p class="text-xs text-gray-500 font-medium mb-0.5">Karar Diskriminatörü</p>
+                            <p class="text-sm font-bold text-gray-800">${data.discriminator || 'Kayıt Yok'}</p>
+                            <p class="text-[10px] text-gray-400 mt-2 text-right">${data.seconds} sn sürdü</p>
+                        </div>
+
+                         <!-- Detailed Area Toggle -->
+                        <button id="btn-${id}" onclick="toggleDetails('${id}')" class="mt-3 text-xs text-blue-600 hover:text-blue-800 font-semibold w-full text-center py-2 bg-blue-50/50 hover:bg-blue-50 transition-colors rounded">
+                            Detayları Göster &darr;
+                        </button>
+
+                        <!-- Hidden Map -->
+                        <div id="details-${id}" class="details-area mt-3 pt-3 border-t border-blue-100">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <h5 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">TSB Analiz Yolu</h5>
+                                    <div class="bg-white p-2 rounded border border-gray-100 shadow-inner max-h-40 overflow-y-auto">
+                                        ${tsbLogsHtml}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">MTS Analiz Yolu</h5>
+                                    <div class="bg-white p-2 rounded border border-gray-100 shadow-inner max-h-40 overflow-y-auto">
+                                        ${mtsLogsHtml}
+                                    </div>
+                                </div>
+                            </div>
+                            ${data.patient && data.patient.history && data.patient.history.length > 0 ? `
+                                <div class="mt-3 pt-3 border-t border-gray-100">
+                                    <h5 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Hastanın Özgeçmişi (Seçilenler)</h5>
+                                    <p class="text-xs text-gray-700 font-medium">${data.patient.history.join(', ')}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+
+                    </div>
+                    `;
+                });
+
+                elKirmizi.innerText = kirmiziCount;
+                elSari.innerText = sariCount;
+                elYesil.innerText = yesilCount;
+
+                recordsList.innerHTML = html;
+
+            } catch (error) {
+                console.error("Error fetching documents: ", error);
+                loadingIndicator.style.display = 'none';
+                recordsList.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-lg border border-red-200 w-full col-span-full">Kayıtlar yüklenirken bir hata oluştu: ${error.message} <br> Not: Firestore güvenlik kurallarınızı kontrol edin.</div>`;
+            }
+        }
+
+        // Yetkili Admin E-posta Adresi
+        // Sadece bu adres paneli görebilir. Dışarıdan gelen kişiler uyarı alır ve sayfadan atılır.
+        const ADMIN_EMAIL = 'md.ahmetaltun.38@gmail.com';
+
+        // Auth State Observer
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Güvenlik Kontrolü: Giriş yapan kişi Admin mi?
+                if (user.email === ADMIN_EMAIL) {
+                    loginBtn.classList.add('hidden');
+                    userInfo.classList.remove('hidden');
+                    userEmailElem.innerText = user.email;
+
+                    loginPrompt.classList.add('hidden');
+                    dashboardArea.classList.remove('hidden');
+
+                    fetchRecords();
+                } else {
+                    // Admin Değilse: Uyarı Ver ve Çıkış Yaptır
+                    alert(`Yetki Hatası! 🛑\n\n'${user.email}' adresinin bu admin paneline erişim yetkisi yoktur.\nLütfen yetkili hesaba (${ADMIN_EMAIL}) geçiş yapın.`);
+                    signOut(auth);
+                }
+            } else {
+                loginBtn.classList.remove('hidden');
+                userInfo.classList.add('hidden');
+
+                loginPrompt.classList.remove('hidden');
+                dashboardArea.classList.add('hidden');
+            }
+        });
+
+        // Login Logic
+        loginBtn.addEventListener('click', () => {
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider).catch((error) => {
+                console.error('Google login failed', error);
+                alert("Giriş başarısız: " + error.message);
+            });
+        });
+
+        // Logout Logic
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).catch((error) => console.error("Sign out error", error));
+        });
+
+        // Refresh Button
+        refreshBtn.addEventListener('click', () => {
+            if (auth.currentUser) fetchRecords();
+        });
+
+        // Export to Excel Button
+        exportExcelBtn.addEventListener('click', () => {
+            if (window.allTriageDataExport.length === 0) {
+                alert("Uyarı: İndirilecek veri bulunamadı.");
+                return;
+            }
+
+            const exportDataStr = window.allTriageDataExport.map(item => {
+
+                // Format TSB Array to String
+                let tsbStr = '';
+                if (item.tsbResponses && item.tsbResponses.length > 0) {
+                    tsbStr = item.tsbResponses.map(r => `${r.question}: ${r.answer}`).join(" | ");
+                }
+
+                // Format MTS Array to String
+                let mtsStr = '';
+                if (item.mtsPath && item.mtsPath.length > 0) {
+                    mtsStr = item.mtsPath.map(r => {
+                        let v = r.value ? `(${r.value})` : '';
+                        return `${r.discriminator}${v}: ${r.answer}`;
+                    }).join(" | ");
+                }
+
+                // Format Patient History
+                let historyStr = '';
+                if (item.patient && item.patient.history) {
+                    historyStr = item.patient.history.join(", ");
+                }
+
+                // Formatted Timestamp
+                let dateStr = formatDate(item.savedAt);
+
+                return {
+                    "Vaka No": item.caseNo || '-',
+                    "Tarih": dateStr,
+                    "Kullanan E-Posta": item.userEmail || '-',
+                    "Hasta Yaşı": item.patient?.age || '-',
+                    "Cinsiyet": item.patient?.gender || '-',
+                    "Varış Sınıfı": item.patient?.arrivalTime || '-',
+                    "Özgeçmiş": historyStr,
+                    "Semptom": item.schema || '-',
+                    "TSB (Sağlık Bak.)": item.tsb || '-',
+                    "MTS (Manchester)": item.mts || '-',
+                    "Uyum": item.compatibilityShort ? item.compatibilityShort.toUpperCase() : '-',
+                    "Karar Verilen Diskriminatör": item.discriminator || '-',
+                    "Triyaj Süresi (Sn)": item.seconds || 0,
+                    "TSB Yanıtları": tsbStr,
+                    "MTS Adımları": mtsStr,
+                };
+            });
+
+            // Create Worksheet
+            const worksheet = XLSX.utils.json_to_sheet(exportDataStr);
+
+            // Adjust column widths purely for aesthetic
+            worksheet['!cols'] = [
+                { wch: 10 }, { wch: 18 }, { wch: 20 }, { wch: 10 },
+                { wch: 10 }, { wch: 15 }, { wch: 25 }, { wch: 25 },
+                { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 30 },
+                { wch: 15 }, { wch: 60 }, { wch: 60 }
+            ];
+
+            // Create Workbook
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Triyaj Kayitlari");
+
+            // Export logic
+            XLSX.writeFile(workbook, "Triyaj_Vaka_Kayitlari.xlsx");
+        });
+
+    </script>
+</body>
+
+</html>

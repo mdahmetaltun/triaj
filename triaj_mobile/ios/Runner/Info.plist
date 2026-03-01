@@ -77,5 +77,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Profil fotoğrafınız için galeriden resim seçebilmeniz adına izne ihtiyacımız var.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Profil fotoğrafınız için kamerayı kullanabilmeniz adına izne ihtiyacımız var.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Profil fotoğrafı kamerası için genel mikrofon iznine ihtiyacımız var.</string>
 </dict>
 </plist>

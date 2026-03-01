@@ -10,6 +10,7 @@ import '../services/firebase_auth_service.dart';
 import '../services/firebase_bootstrap.dart';
 import '../services/triage_record_repository.dart';
 import 'triage_history_page.dart';
+import 'profile_page.dart';
 
 class TriageHomePage extends StatefulWidget {
   const TriageHomePage({
@@ -1131,23 +1132,40 @@ class _TriageHomePageState extends State<TriageHomePage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Tooltip(
-          message: _authUser?.email ?? 'Google kullanıcı',
-          child: CircleAvatar(
-            radius: 14,
-            backgroundColor: _pick(
-              const Color(0x338B5CF6),
-              const Color(0x33FF9F68),
-            ),
-            child: Text(
-              ((_authUser?.displayName ?? _authUser?.email ?? 'G').trim())
-                  .substring(0, 1)
-                  .toUpperCase(),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: _pick(const Color(0xFFF0E8FF), const Color(0xFF6B46C1)),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+          },
+          child: Tooltip(
+            message: 'Profili Düzenle',
+            child: CircleAvatar(
+              radius: 14,
+              backgroundColor: _pick(
+                const Color(0x338B5CF6),
+                const Color(0x33FF9F68),
               ),
+              backgroundImage: _authUser?.photoURL != null
+                  ? NetworkImage(_authUser!.photoURL!)
+                  : null,
+              child: _authUser?.photoURL == null
+                  ? Text(
+                      ((_authUser?.displayName ?? _authUser?.email ?? 'G')
+                              .trim())
+                          .substring(0, 1)
+                          .toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: _pick(
+                          const Color(0xFFF0E8FF),
+                          const Color(0xFF6B46C1),
+                        ),
+                      ),
+                    )
+                  : null,
             ),
           ),
         ),

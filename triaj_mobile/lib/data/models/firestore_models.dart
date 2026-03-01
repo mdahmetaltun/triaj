@@ -20,10 +20,14 @@ DateTime? _asDateTime(dynamic value) {
 class AppUserProfile {
   const AppUserProfile({
     required this.uid,
-    required this.email,
-    required this.displayName,
-    required this.photoUrl,
+    this.email,
+    this.displayName,
+    this.photoUrl,
     required this.providerIds,
+    this.name,
+    this.surname,
+    this.institution,
+    this.profession,
     this.createdAt,
     this.updatedAt,
     this.lastLoginAt,
@@ -34,6 +38,10 @@ class AppUserProfile {
   final String? displayName;
   final String? photoUrl;
   final List<String> providerIds;
+  final String? name;
+  final String? surname;
+  final String? institution;
+  final String? profession;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DateTime? lastLoginAt;
@@ -54,6 +62,23 @@ class AppUserProfile {
     );
   }
 
+  factory AppUserProfile.fromMap(Map<String, dynamic> map) {
+    return AppUserProfile(
+      uid: map['uid'] as String? ?? '',
+      email: map['email'] as String?,
+      displayName: map['displayName'] as String?,
+      photoUrl: map['photoUrl'] as String?,
+      providerIds: List<String>.from(map['providerIds'] ?? []),
+      name: map['name'] as String?,
+      surname: map['surname'] as String?,
+      institution: map['institution'] as String?,
+      profession: map['profession'] as String?,
+      createdAt: _asDateTime(map['createdAt']),
+      updatedAt: _asDateTime(map['updatedAt']),
+      lastLoginAt: _asDateTime(map['lastLoginAt']),
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'uid': uid,
@@ -61,10 +86,44 @@ class AppUserProfile {
       'displayName': displayName,
       'photoUrl': photoUrl,
       'providerIds': providerIds,
+      'name': name,
+      'surname': surname,
+      'institution': institution,
+      'profession': profession,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
       'lastLoginAt': lastLoginAt,
     };
+  }
+
+  AppUserProfile copyWith({
+    String? uid,
+    String? email,
+    String? displayName,
+    String? photoUrl,
+    List<String>? providerIds,
+    String? name,
+    String? surname,
+    String? institution,
+    String? profession,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? lastLoginAt,
+  }) {
+    return AppUserProfile(
+      uid: uid ?? this.uid,
+      email: email ?? this.email,
+      displayName: displayName ?? this.displayName,
+      photoUrl: photoUrl ?? this.photoUrl,
+      providerIds: providerIds ?? this.providerIds,
+      name: name ?? this.name,
+      surname: surname ?? this.surname,
+      institution: institution ?? this.institution,
+      profession: profession ?? this.profession,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lastLoginAt: lastLoginAt ?? this.lastLoginAt,
+    );
   }
 }
 
